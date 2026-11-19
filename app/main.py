@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from app import coingecko, watchlist
@@ -8,6 +8,11 @@ app = FastAPI(title="Crypto API")
 
 class WatchlistIn(BaseModel):
     symbol: str = Field(min_length=1, max_length=10)
+    note: str | None = None
+    target_price: float | None = Field(default=None, gt=0)
+
+
+class WatchlistUpdate(BaseModel):
     note: str | None = None
     target_price: float | None = Field(default=None, gt=0)
 
@@ -60,3 +65,20 @@ def add_to_watchlist(body: WatchlistIn):
 @app.get("/watchlist")
 def show_watchlist():
     return watchlist.get_all()
+
+
+@app.put("/crypto/{symbol}")
+def update_watchlist_item(symbol: str, body: WatchlistUpdate):
+    symbol = symbol.upper()
+    if watchlist.get(symbol) is None:
+        raise HTTPException(status_code=404, detail="Coin staat niet in de watchlist")
+    return watchlist.update(symbol, body.model_dump(exclude_unset=True))
+
+
+@app.delete("/crypto/{symbol}", status_code=204)
+def delete_from_watchlist(symbol: str):
+    symbol = symbol.upper()
+    if watchlist.get(symbol) is None:
+        raise HTTPException(status_code=404, detail="Coin staat niet in de watchlist")
+    watchlist.remove(symbol)
+    return Response(status_code=204)
